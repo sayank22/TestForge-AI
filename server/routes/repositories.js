@@ -84,7 +84,7 @@ router.get('/:owner/:repo/files', async (req, res) => {
   }
 });
 
-// ✅ 3. Generate test summaries
+// ✅ 3. Generate test summaries (FIXED)
 router.post('/generate-summaries', async (req, res) => {
   try {
     const client = getClientFromSession(req);
@@ -102,21 +102,30 @@ router.post('/generate-summaries', async (req, res) => {
     const { data: repoData } = await client.octokit.repos.get({ owner, repo });
     const primaryLanguage = repoData.language || 'JavaScript';
 
-    const rawSummaries = await aiService.generateTestSummaries(fileContents, primaryLanguage);
+    const result = await aiService.generateTestSummaries(fileContents, primaryLanguage);
 
-    // 🧹 Clean up AI output before parsing
-    let cleanText = rawSummaries.trim();
-    cleanText = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
-
+    // 🛡️ LOGIC FIX: Check if result is already an Object/Array
     let summaries;
-    try {
-      summaries = JSON.parse(cleanText);
-    } catch (err) {
-      console.error("⚠️ Could not parse AI response as JSON", err);
-      summaries = [{ error: "Invalid AI response", raw: cleanText }];
+    
+    if (typeof result === 'object') {
+       // It's already parsed (the AI Service did it)
+       summaries = result;
+    } else {
+       // It's a string, so we need to clean and parse it
+       let cleanText = result.toString().trim();
+       cleanText = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
+       
+       try {
+         summaries = JSON.parse(cleanText);
+       } catch (err) {
+         console.error("⚠️ Could not parse AI response as JSON", err);
+         summaries = [{ error: "Invalid AI response", raw: cleanText }];
+       }
     }
 
+    // Ensure we are sending back an object with a 'summaries' key
     res.json({ summaries });
+    
   } catch (error) {
     console.error('Error generating summaries:', error);
     res.status(500).json({ error: error.message });

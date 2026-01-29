@@ -14,8 +14,9 @@ class AIService {
     try {
       if (process.env.GEMINI_API_KEY) {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        this.model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-        console.log('✅ Gemini AI service initialized');
+        // UPDATED: Changed to 1.5 Flash as requested
+        this.model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        console.log('✅ Gemini AI service initialized (Model: 2.5 Flash)');
       } else {
         console.warn('⚠️ Gemini API key not found, AI generation disabled');
       }
@@ -24,9 +25,6 @@ class AIService {
     }
   }
 
-  /**
-   * Generate structured test case summaries from code files
-   */
   async generateTestSummaries(fileContents, primaryLanguage) {
     if (!this.model) {
       throw new Error('Gemini AI service not available');
@@ -67,8 +65,11 @@ Format as **pure JSON array**, like:
       const result = await this.model.generateContent(prompt);
       const rawContent = result.response.text().trim();
 
+      // Clean up markdown code blocks if the AI adds them
+      const cleanJson = rawContent.replace(/```json/g, '').replace(/```/g, '').trim();
+
       try {
-        return JSON.parse(rawContent);
+        return JSON.parse(cleanJson);
       } catch {
         console.warn("⚠️ Could not parse AI response as JSON, returning raw text");
         return rawContent;
@@ -79,9 +80,6 @@ Format as **pure JSON array**, like:
     }
   }
 
-  /**
-   * Generate runnable test code based on a summary
-   */
   async generateTestCode(summary, files, language) {
     if (!this.model) {
       throw new Error('Gemini AI service not available');
